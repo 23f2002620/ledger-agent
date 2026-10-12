@@ -45,7 +45,21 @@ def parse_question(question: str) -> Dict[str, Any]:
         result['group_by'] = 'product'
         result['limit'] = 1
 
-    # 3. Detect intent based on keywords (if not already set)
+    # 3. Detect top-selling / top selling product by revenue patterns
+    # Patterns like: "top-selling product by revenue", "top selling product by revenue", "top product by revenue"
+    if ('top-selling' in q_lower or 'top selling' in q_lower or 'top product' in q_lower) and ('by revenue' in q_lower or 'by total' in q_lower or 'by amount' in q_lower):
+        result['intent'] = 'revenue'
+        result['group_by'] = 'product'
+        result['limit'] = 1
+    # Also handle "top-selling [product] by revenue" without the word "product" explicitly?
+    # We'll rely on the product extraction later to set the group_by if needed, but we already set group_by to product above.
+    # If the above didn't match, we can also look for "top-selling" and "revenue" and assume we want top product by revenue.
+    elif ('top-selling' in q_lower or 'top selling' in q_lower) and ('revenue' in q_lower or 'total' in q_lower or 'amount' in q_lower):
+        result['intent'] = 'revenue'
+        result['group_by'] = 'product'
+        result['limit'] = 1
+
+    # 4. Detect intent based on keywords (if not already set)
     if result['intent'] is None:
         if any(word in q_lower for word in ['revenue', 'sales', 'income', 'total amount']):
             result['intent'] = 'revenue'
@@ -61,21 +75,21 @@ def parse_question(question: str) -> Dict[str, Any]:
             # Default to revenue if unclear
             result['intent'] = 'revenue'
 
-    # 4. Extract region
+    # 5. Extract region
     regions = ['north', 'south', 'east', 'west', 'central']
     for region in regions:
         if region in q_lower:
             result['filters']['region'] = region.capitalize()  # Store as proper case
             break
 
-    # 5. Extract product: look for known product names
+    # 6. Extract product: look for known product names
     known_products = ['Blender', 'Mixer', 'Kettle', 'Air Fryer', 'Juicer', 'Grinder', 'Toaster']
     for product in known_products:
         if product.lower() in q_lower:
             result['filters']['product'] = product
             break
 
-    # 6. Extract customer
+    # 7. Extract customer
     # Look for pattern C followed by digits
     customer_match = re.search(r'\b(C\d+)\b', question, re.IGNORECASE)
     if customer_match:
@@ -89,28 +103,28 @@ def parse_question(question: str) -> Dict[str, Any]:
             if match:
                 result['filters']['customer'] = match.group(1).upper()
 
-    # 7. Extract status
+    # 8. Extract status
     statuses = ['paid', 'refunded', 'void']
     for status in statuses:
         if status in q_lower:
             result['filters']['status'] = status
             break
 
-    # 8. Extract time range
+    # 9. Extract time range
     time_start, time_end = _extract_time_range(q_lower)
     if time_start:
         result['filters']['time_start'] = time_start
     if time_end:
         result['filters']['time_end'] = time_end
 
-    # 9. Extract grouping (only if not already set by top patterns)
+    # 10. Extract grouping (only if not already set by top patterns)
     if result['group_by'] is None:
         if 'per product' in q_lower or 'by product' in q_lower:
             result['group_by'] = 'product'
         elif 'per customer' in q_lower or 'by customer' in q_lower:
             result['group_by'] = 'customer'
 
-    # 10. Extract limit for top-N queries (only if not already set by top patterns)
+    # 11. Extract limit for top-N queries (only if not already set by top patterns)
     if result['limit'] is None:
         # Look for patterns like "top 5", "top 10", "highest 3"
         limit_match = re.search(r'(?:top|highest)\s+(\d+)', q_lower)
