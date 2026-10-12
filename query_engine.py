@@ -18,6 +18,8 @@ def compute_answer(
     filters = parsed_question['filters'].copy()
     group_by = parsed_question['group_by']
     limit = parsed_question['limit']
+    distinct = parsed_question.get('distinct', False)
+    average = parsed_question.get('average', False)
 
     # Set default status based on intent if not specified
     if intent in ['revenue', 'refunded_amount', 'top_product', 'top_customer']:
@@ -55,12 +57,22 @@ def compute_answer(
                 # No limit, return the groups dict
                 answer = groups
         else:
-            # No grouping, just sum
+            # No grouping, compute sum or average
             total = sum(order['amount_usd'] for order in filtered_orders)
-            answer = round(total, 2)  # two decimal places for currency
+            if average:
+                # Compute average: total / count
+                count = len(filtered_orders)
+                answer = round(total / count, 2) if count > 0 else 0
+            else:
+                # No grouping, just sum
+                answer = round(total, 2)  # two decimal places for currency
 
     elif intent == 'order_count':
-        if group_by:
+        if distinct:
+            # Count distinct customers (regardless of group_by)
+            unique_customers = set(order['customer'] for order in filtered_orders)
+            answer = len(unique_customers)
+        elif group_by:
             # Group by and count
             groups = {}
             for order in filtered_orders:

@@ -26,7 +26,9 @@ def parse_question(question: str) -> Dict[str, Any]:
         'intent': None,
         'filters': {},
         'group_by': None,
-        'limit': None
+        'limit': None,
+        'distinct': False,  # Whether to count distinct customers
+        'average': False    # Whether to compute average instead of sum
     }
 
     # 1. Detect count questions (priority when question is about counting)
@@ -75,10 +77,29 @@ def parse_question(question: str) -> Dict[str, Any]:
             # Default to revenue if unclear
             result['intent'] = 'revenue'
 
+    # 4.5. Detect distinct/different modifiers (for counting distinct customers)
+    if result['intent'] == 'order_count':
+        # Check for words that indicate we want distinct/customers counted uniquely
+        distinct_indicators = ['different', 'distinct', 'unique']
+        if any(indicator in q_lower for indicator in distinct_indicators):
+            # Additionally, check if the question is about customers
+            if 'customer' in q_lower:
+                result['distinct'] = True
+
+    # 4.6. Detect average modifier
+    average_indicators = ['average', 'avg', 'mean']
+    if any(indicator in q_lower for indicator in average_indicators):
+        # For average, we typically want to compute average of amounts
+        # This applies to revenue-like queries
+        if result['intent'] in ['revenue', 'refunded_amount']:
+            result['average'] = True
+
     # 5. Extract region
+    import re
     regions = ['north', 'south', 'east', 'west', 'central']
     for region in regions:
-        if region in q_lower:
+        # Use word boundary regex to avoid matching substrings (e.g., "east" in "toaster")
+        if re.search(r'\b' + re.escape(region) + r'\b', q_lower):
             result['filters']['region'] = region.capitalize()  # Store as proper case
             break
 
