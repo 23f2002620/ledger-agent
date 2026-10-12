@@ -32,8 +32,14 @@ def parse_question(question: str) -> Dict[str, Any]:
     }
 
     # 1. Detect count questions (priority when question is about counting)
-    if q_lower.startswith('how many') or q_lower.startswith('number of') or q_lower.startswith('what is the number of'):
+    if q_lower.startswith('how many') or q_lower.startswith('number of') or q_lower.startswith('what is the number of') or q_lower.startswith('count'):
         result['intent'] = 'order_count'
+
+    # 1.5. Detect average/revenue patterns that might be mistaken for count
+    # e.g., "On average, how many US dollars is a paid Central order worth?"
+    if ('average' in q_lower or q_lower.startswith('on average')) and any(term in q_lower for term in ['dollar', 'usd', 'money', 'worth', 'value', 'amount']):
+        # Override to revenue intent for average questions about money/value
+        result['intent'] = 'revenue'
 
     # 2. Detect top customer / product patterns (which customer had the highest revenue, etc.)
     # Pattern: which customer had the highest revenue
